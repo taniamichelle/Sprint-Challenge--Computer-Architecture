@@ -11,7 +11,7 @@ HLT = 0b00000001
 MUL = 0b10100010
 ADD = 0b10100000
 SUB = 0b10100001
-PUSH = 0b01000101
+PUSH = 0b01000101          
 POP = 0b1000110
 CMP = 0b10100111
 JMP = 0b01010100
@@ -124,30 +124,30 @@ class CPU:
         '''
         sys.exit()
 
-    def JMP(self, register_a):
+    def JMP(self, operand_a):
         '''
         Jump to the address stored in the given register.
         Set the PC to the address stored in the given register.
         '''
-        self.pc = self.register[register_a]  # Set pc to register_a
+        self.pc = self.register[operand_a]  # Set pc to operand_a
     
-    def JEQ(self, register_a):
+    def JEQ(self, operand_a):
         '''
         If equal flag is set (true), jump to the address stored 
         in the given register.
         '''
         if self.flag == 0b00000001:  # If equal flag
-            self.JMP(register_a)
+            self.JMP(operand_a)
         else: 
             self.pc += 2  # Increment pc by 2
 
-    def JNE(self, register_a):
+    def JNE(self, operand_a):
         '''
         If E flag is clear (false, 0), jump to the address stored 
         in the given register.
         '''
         if self.flag == 0b00000010 or self.flag == 0b00000100:  # If flag < or >, respectively
-            self.JMP(register_a)
+            self.JMP(operand_a)
         else:
             self.pc += 2
 
