@@ -265,7 +265,7 @@ class CPU:
                 self.flag = 0b00000001
             self.pc += 3
         else:
-            raise Exception("Unsupported ALU operation")
+            raise Exception("Unsupported ALU operation.")
 
     def trace(self):
         """
