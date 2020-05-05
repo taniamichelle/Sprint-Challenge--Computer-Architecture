@@ -17,4 +17,4 @@
 -Instruction layout: AABCDDDD. AA Number of operands for this opcode, 0-2. B 1 if this is an ALU operation. C 1 if this instruction sets the PC
 DDDD Instruction identifier (important for auto-incrementing instruction length. jump PCs are set by instructions so they have a 'C').
 
-- Code to extract the instruction length from the opcode on the LS8 (auto-increments): `inst_len = ((ir & 0b11000000) >> 6) + 1 # 3 pc += inst_len`
+- Code to extract the instruction length from the opcode on the LS8 (auto-increments): `inst_len = ((ir & 0b11000000) >> 6) + 1` then `pc += inst_len`

@@ -17,15 +17,12 @@ instruction_hash = {
     0b01000111: 'PRN',  # Print numeric value stored in the given register. Print to the console the decimal integer value that is stored in the given register
     0b01000101: 'PUSH',  # Push the value in given register onto top of stack
     0b00010001: 'RET',  # Return from subroutine
-    0b10100001: 'SUB',  # Subtract the value in the second register from the first, storing the result in registerA.
-    
+    0b10100001: 'SUB'  # Subtract the value in the second register from the first, storing the result in registerA.  
 }
 
-### FLAGS ### 
-# The flags register FL holds the current flags status. These flags can change based on the operands given to the CMP opcode.
-# The register is made up of 8 bits. If a particular bit is set, that flag is "true".
-# FL bits: 00000LGE
-# E Equal: during a CMP, set to 1 if registerA is equal to registerB, zero otherwise.
+### Code to extract instruction length ###
+# inst_len = ((IR & 0b11000000) >> 6) + 1
+# PC += inst_len
 
 class CPU:
     """Main CPU class."""
@@ -36,6 +33,7 @@ class CPU:
         self.register = [0] * 8  # 8 registers of 1-byte each
         self.pc = 0  # Program counter starting at 0th block of memory
         self.sp = 7  # SP is R7
+        self.flag = 0
         self.operands = None
         self.operand_a = None
         self.operand_b = None
@@ -43,12 +41,16 @@ class CPU:
             'LDI': self.execute_ldi,
             'PRN': self.execute_prn,
             'HLT': self.execute_hlt,
-            'ADD': self.
+            'ADD': self.execute_add,
             'MUL': self.execute_mul,
             'PUSH': self.execute_push,
             'POP': self.execute_pop,
             'CALL': self.execute_call,
-            'RET': self.execute_ret
+            'RET': self.execute_ret,
+            'CMP': self.execute_cmp,
+            'JMP': self.execute_jmp,
+            'JEQ': self.execute_jeq,
+            'JNE': self.execute_jne
         }
     
     def execute_call(self):
@@ -92,7 +94,7 @@ class CPU:
         # print("sp end in push: ", self.sp)
         # Copy the value in the given register(from R0-R6) to the address pointed to by SP
         self.ram[self.register[self.sp]] = val
-        # self.pc += 2
+        self.pc += 2  # Comment out if using handle_pc function
 
     def execute_pop(self):
         '''
@@ -109,7 +111,7 @@ class CPU:
         # Increment SP
         self.register[self.sp] += 1
         # print("sp end in pop: ", self.sp)
-        # self.pc += 2
+        self.pc += 2  # comment out if using handle_pc function
     
     def execute_add(self):
         '''
@@ -134,28 +136,21 @@ class CPU:
         # print('register 1', self.register)
         self.alu('SUB', self.operand_a, self.operand_b)
 
-    def execute_cmp(self):
-        '''
-        Compare the values in two registers (regA, regB).
-        If they are equal, set the Equal E flag to 1, otherwise set it to 0.
-        If registerA is less than registerB, set the Less-than L flag to 1, otherwise set it to 0.
-        If registerA is greater than registerB, set the Greater-than G flag to 1, otherwise set it to 0.
-        '''
-        
-
     def execute_ldi(self):
         '''
         Runs `LDI`, which sets the value of a register to an integer.
         '''
         self.register[self.operand_a] = self.operand_b  # Store value (op b) in reg 0 (op a)
-        # self.pc += self.operands  # Increment pc by num of operands
+        # self.pc += 3
+        self.pc += self.operands  # Increment pc by num of operands
 
     def execute_prn(self):
         '''
         Prints numeric value (decimal integer)stored in the given register to console.
         '''
         print("PRN: ", self.register[self.operand_a])
-        # self.pc += self.operands
+        # self.pc += 2
+        self.pc += self.operands
 
     def execute_hlt(self):
         '''
@@ -163,20 +158,54 @@ class CPU:
         '''
         sys.exit()
 
+    def execute_cmp(self):
+        '''
+        Runs alu() method passing in `CMP` as the instructional argument.
+        Compares the values in two registers (regA, regB).
+        If they are equal, set the Equal E flag to 1, otherwise set it to 0.
+        If registerA is less than registerB, set the Less-than L flag to 1, otherwise set it to 0.
+        If registerA is greater than registerB, set the Greater-than G flag to 1, otherwise set it to 0.
+        '''
+        # print('register 1', self.register)
+        self.alu('CMP', self.operand_a, self.operand_b)
+
     def execute_jmp(self):
         '''
         Jump to the address stored in the given register.
         Set the PC to the address stored in the given register.
         '''
+        self.pc = self.register[reg_a]
+    
+    def execute_jeq(self):
+        '''
+        If equal flag is set (true), jump to the address stored 
+        in the given register.
+        '''
+        if self.flag == 0b00000001:  # If equal flag
+            self.execute_jmp(reg_a)
+        else: 
+            self.pc += self.operands  # Increment pc
+            # self.pc += 2
 
-    def handle_pc(self, IR):
+    def execute_jne(self):
         '''
-        Method to make pc dynamic.
+        If E flag is clear (false, 0), jump to the address stored 
+        in the given register.
         '''
-        if ((IR <<3)%256) >>7 == 1:  # Isolate `B` condition from instructions
-            pass
+        if self.flag == 0b00000010 or self.flag == 0b00000100:  # If flag < or >, respectively
+            self.execute_jmp(reg_a)
         else:
-            self.pc += self.operands + 1  # Alternative to incrementing pc in each method
+            self.pc += self.operands  # Increment pc
+            # self.pc += 2
+
+    # def handle_pc(self, IR):
+    #     '''
+    #     Method to make pc dynamic.
+    #     '''
+    #     if ((IR <<3)%256) >>7 == 1:  # Isolate `B` condition from instructions
+    #         pass
+    #     else:
+    #         self.pc += self.operands + 1  # Alternative to incrementing pc in each method
 
     def ram_read(self, MAR):
         '''
@@ -212,17 +241,29 @@ class CPU:
 
     def alu(self, op, reg_a, reg_b):
         """
-        ALU operations, including CMP (regA, regB)
+        ALU operations, including CMP (regA, regB).
         """
 
         if op == "ADD":
             self.register[reg_a] += self.register[reg_b]
+            self.pc += 3
         elif op == "MUL":
             self.register[reg_a] *= self.register[reg_b]
+            self.pc += 3
         elif op == "SUB": 
             self.register[reg_a] -= self.register[reg_b]
+            self.pc += 3
         elif op == "CMP":
-
+            # set L (less-than) flag set to 1 if registerA is less than registerB, zero otherwise. 
+            if self.register[reg_a] < self.register[reg_b]:
+                self.flag = 0b00000010
+            # set G (greater-than) flag set to 1 if registerA is greater than registerB, zero otherwise. 
+            elif self.register[reg_a] < self.register[reg_b]:
+                self.flag = 0b00000100
+            # set E (equal) flag to 1 if registerA is equal to registerB, zero otherwise.
+            elif self.register[reg_a] == self.register[reg_b]:
+                self.flag = 0b00000001
+            self.pc += 3
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -246,7 +287,6 @@ class CPU:
 
         print()
 
-
     def run(self):
         """
         Reads the memory address stored in `PC` and stores the result in `IR`. Runs the CPU. 
@@ -256,13 +296,23 @@ class CPU:
             IR = self.ram_read(self.pc)  # Read and store memory address stored in reg `PC` as IR
             self.operands = IR >> 6  # Right-shift IR by 6 so that the high bits (containing # operands) are rightmost
 
-            if self.operands == 1:  # If 1 argument (operand)
+            if self.operands == 1:  # If 1 argument (operand_a)
                 self.operand_a = self.ram_read(self.pc+1)
-            elif self.operands == 2:  # If 2 arguments
+            elif self.operands == 2:  # If 2 arguments (operand_a, operand_b)
                 self.operand_a = self.ram_read(self.pc+1)
                 self.operand_b = self.ram_read(self.pc+2)
             print("IR", IR)
             self.methods_hash[instruction_hash[IR]]()  # Invoke our methods_hash as a function
-            self.handle_pc(IR)
-            # self.pc += 1  # Increment pc by 1
+            
+            # self.handle_pc(IR)  # Uncomment if using handle_pc function
+            # self.pc += 1  # Increment pc by 1. Comment out if using handle_pc function
+            
+            
+            # operand_a = self.ram_read(IR + 1)  # Get operand_a
+            # operand_b = self.ram_read(IR + 2)  # Get operand_b
+            # if IR in self.methods_hash:
+            #     self.methods_hash[IR](operand_a, operand_b)
 
+            else:
+                print(f"Unknown instruction.")
+                sys.exit(1)
